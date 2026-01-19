@@ -1,0 +1,18 @@
+{
+  "name": "minebot-tools-standalone",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "pkg index.js --compress GZip --output dist/tools --targets node18-linux-x64,node18-linux-arm64"
+  },
+  "description": "",
+  "pkg": {
+    "scripts": "index.js",
+    "assets": [],
+    "targets": [
+      "node18-linux-x64",
+      "node18-linux-arm64"
+    ]
+  }
+}
