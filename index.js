@@ -385,19 +385,34 @@ const startToolProcess = (name, binPath, args = [], options = {}) => {
     stopToolProcess(name);
     const proc = spawn(binPath, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
     pids[name] = proc;
-    pids[name] = proc;
     proc.stdout?.on('data', d => {
       const msg = d.toString().trim();
       if (config.logs?.enabled && config.logs?.logTools) {
-        // Filter out verbose INF logs for cloudflared
         if (name === _CK.t0 && msg.includes('INF')) return;
         log('tool', 'info', `[${name}] ${msg}`);
       }
     });
     proc.stderr?.on('data', d => log('tool', 'info', `[${name}] ${d.toString().trim()}`));
-    proc.on('error', err => { pids[name] = null; reject(err); });
-    proc.on('exit', code => { pids[name] = null; });
-    setTimeout(() => resolve(), 1000);
+
+    let started = false;
+    proc.on('error', err => {
+      if (!started) {
+        pids[name] = null;
+        reject(err);
+      }
+    });
+    proc.on('exit', code => {
+      pids[name] = null;
+      if (!started) {
+        reject(new Error(`Process exited early with code ${code}`));
+      }
+    });
+    setTimeout(() => {
+      if (pids[name]) {
+        started = true;
+        resolve();
+      }
+    }, 1000);
   });
 };
 
@@ -1520,6 +1535,22 @@ const app = (req, res) => {
 };
 
 const server = createServer(app);
+
+const cleanupOrphans = () => {
+  log('tool', 'info', '\u6b63\u5728\u6e05\u7406\u6b8b\u7559\u8fdb\u7a0b...');
+  for (const [key, filename] of Object.entries(fileMap)) {
+    if (key.includes('bin') && filename) {
+      try {
+        if (process.platform === 'win32') {
+          execSync(`taskkill /F /IM ${filename}.exe`, { stdio: 'ignore' });
+        } else {
+          execSync(`pkill -f ${filename}`, { stdio: 'ignore' });
+        }
+      } catch { }
+    }
+  }
+};
+cleanupOrphans();
 
 const PORT = parseInt(process.env.SERVER_PORT || process.env.PRIMARY_PORT || process.env.PORT, 10) || config.port || 3097;
 server.listen(PORT, '0.0.0.0', () => {
