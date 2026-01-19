@@ -385,7 +385,15 @@ const startToolProcess = (name, binPath, args = [], options = {}) => {
     stopToolProcess(name);
     const proc = spawn(binPath, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
     pids[name] = proc;
-    proc.stdout?.on('data', d => log('tool', 'info', `[${name}] ${d.toString().trim()}`));
+    pids[name] = proc;
+    proc.stdout?.on('data', d => {
+      const msg = d.toString().trim();
+      if (config.logs?.enabled && config.logs?.logTools) {
+        // Filter out verbose INF logs for cloudflared
+        if (name === _CK.t0 && msg.includes('INF')) return;
+        log('tool', 'info', `[${name}] ${msg}`);
+      }
+    });
     proc.stderr?.on('data', d => log('tool', 'info', `[${name}] ${d.toString().trim()}`));
     proc.on('error', err => { pids[name] = null; reject(err); });
     proc.on('exit', code => { pids[name] = null; });
@@ -1520,7 +1528,22 @@ server.listen(PORT, '0.0.0.0', () => {
 
   for (const [name, cfg] of Object.entries(config.tools)) {
     if (cfg.autoStart && tools[name]) {
-      tools[name].start().catch(err => log('tool', 'error', `[${name}] \u81ea\u52a8\u542f\u52a8\u5931\u8d25: ${err.message}`));
+      if (cfg.autoStart && tools[name]) {
+        // Retry up to 3 times with 2s delay
+        const startWithRetry = async (retries = 3) => {
+          try {
+            await tools[name].start();
+          } catch (err) {
+            if (retries > 0) {
+              log('tool', 'error', `[${name}] \u81ea\u52a8\u542f\u52a8\u5931\u8d25: ${err.message}\uff0c2\u79d2\u540e\u91cd\u8bd5 (${retries})`);
+              setTimeout(() => startWithRetry(retries - 1), 2000);
+            } else {
+              log('tool', 'error', `[${name}] \u81ea\u52a8\u542f\u52a8\u6700\u7ec8\u5931\u8d25: ${err.message}`);
+            }
+          }
+        };
+        startWithRetry();
+      }
     }
   }
 });
