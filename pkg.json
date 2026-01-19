@@ -1,0 +1,8 @@
+{
+    "scripts": "index.js",
+    "assets": [],
+    "targets": [
+        "node18-linux-x64",
+        "node18-linux-arm64"
+    ]
+}

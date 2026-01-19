@@ -1,3 +1,10 @@
+// Suppress ExperimentalWarning: The Fetch API is an experimental feature
+const originalEmit = process.emit;
+process.emit = function (name, data, ...args) {
+  if (name === 'warning' && typeof data === 'object' && data.name === 'ExperimentalWarning' && data.message.includes('Fetch API')) return false;
+  return originalEmit.apply(process, [name, data, ...args]);
+};
+
 const { spawn, execSync } = require('child_process');
 const { createWriteStream, createReadStream, existsSync, mkdirSync, rmSync, readFileSync, writeFileSync, chmodSync } = require('fs');
 const { join, dirname } = require('path');
