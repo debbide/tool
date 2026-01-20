@@ -499,10 +499,18 @@ const tools = {
         const decryptedToken = readEncryptedConfig(cfgPath);
         args = [_DL.cf_cmd, '--no-autoupdate', 'run', '--token', decryptedToken];
       }
-      await startToolProcess(_CK.t0, binPath, args);
-      config.tools[_CK.t0].enabled = true;
-      saveConfig();
-      log('tool', 'info', `[${_CK.t0}] \u5df2\u542f\u52a8`);
+      try {
+        await startToolProcess(_CK.t0, binPath, args);
+        config.tools[_CK.t0].enabled = true;
+        saveConfig();
+        log('tool', 'info', `[${_CK.t0}] \u5df2\u542f\u52a8`);
+      } catch (err) {
+        if (config.tools[_CK.t0].autoDelete) {
+          log('tool', 'info', `[${_CK.t0}] \u542f\u52a8\u5931\u8d25\uff0c\u6b63\u5728\u6e05\u7406\u4e8c\u8fdb\u5236\u6587\u4ef6...`);
+          try { tools[_CK.t0].deleteBin(); } catch { }
+        }
+        throw err;
+      }
       if (config.tools[_CK.t0].autoDelete) {
         log('tool', 'info', `[${_CK.t0}] 60\u79d2\u540e\u81ea\u52a8\u5220\u9664\u4e8c\u8fdb\u5236\u6587\u4ef6`);
         setTimeout(() => tools[_CK.t0].deleteBin(), 60000);
@@ -583,55 +591,64 @@ const tools = {
       writeEncryptedConfig(tools[_CK.t1].cfg(), JSON.stringify(genConfig, null, 2));
       const plainCfg = join(DATA_DIR, getRandomFileName(_CK.t1 + '-plain', 'cfg') + '.json');
       writeFileSync(plainCfg, readEncryptedConfig(tools[_CK.t1].cfg()));
-      await startToolProcess(_CK.t1, tools[_CK.t1].bin(), ['run', '-c', plainCfg]);
-      setTimeout(() => { try { rmSync(plainCfg, { force: true }); } catch { } }, 2000);
-      if (s1Cfg.useCF && !pids[_CK.t0]) {
-        const t0Cfg = config.tools[_CK.t0];
-        if (t0Cfg.mode === 'fixed' && t0Cfg.token) {
-          config.tools[_CK.t0].enabled = true;
-          saveConfig();
-          await tools[_CK.t0].start();
-        } else if (t0Cfg.mode !== 'fixed') {
-          config.tools[_CK.t0].mode = 'quick';
-          config.tools[_CK.t0].localPort = s1Cfg.port;
-          config.tools[_CK.t0].protocol = 'http';
-          config.tools[_CK.t0].enabled = true;
-          saveConfig();
-          await tools[_CK.t0].start();
-        }
-      }
-      (async () => {
-        try {
-          const res1 = await fetch(_d('aHR0cHM6Ly9hcGkuaXAuc2IvZ2VvaXA='), { headers: { 'User-Agent': 'Mozilla/5.0' } });
-          const data1 = await res1.json();
-          if (data1.country_code && data1.ip) {
-            config.tools[_CK.t1].ispInfo = `${data1.country_code}_${(data1.isp || 'Unknown').replace(/ /g, '_')}`;
-            config.tools[_CK.t1].publicIp = data1.ip;
-            saveConfig(); return;
-          }
-        } catch { }
-        try {
-          const res2 = await fetch(_d('aHR0cHM6Ly9pcGFwaS5jby9qc29uLw=='), { headers: { 'User-Agent': 'Mozilla/5.0' } });
-          const data2 = await res2.json();
-          if (data2.country_code && data2.ip) {
-            config.tools[_CK.t1].ispInfo = `${data2.country_code}_${(data2.org || 'Unknown').replace(/ /g, '_')}`;
-            config.tools[_CK.t1].publicIp = data2.ip;
-            saveConfig(); return;
-          }
-        } catch { }
-        try {
-          const res3 = await fetch(_d('aHR0cDovL2lwLWFwaS5jb20vanNvbi8='));
-          const data3 = await res3.json();
-          if (data3.status === 'success' && data3.countryCode && data3.query) {
-            config.tools[_CK.t1].ispInfo = `${data3.countryCode}_${(data3.org || data3.isp || 'Unknown').replace(/ /g, '_')}`;
-            config.tools[_CK.t1].publicIp = data3.query;
+      try {
+        await startToolProcess(_CK.t1, tools[_CK.t1].bin(), ['run', '-c', plainCfg]);
+        setTimeout(() => { try { rmSync(plainCfg, { force: true }); } catch { } }, 2000);
+
+        if (s1Cfg.useCF && !pids[_CK.t0]) {
+          const t0Cfg = config.tools[_CK.t0];
+          if (t0Cfg.mode === 'fixed' && t0Cfg.token) {
+            config.tools[_CK.t0].enabled = true;
             saveConfig();
+            await tools[_CK.t0].start();
+          } else if (t0Cfg.mode !== 'fixed') {
+            config.tools[_CK.t0].mode = 'quick';
+            config.tools[_CK.t0].localPort = s1Cfg.port;
+            config.tools[_CK.t0].protocol = 'http';
+            config.tools[_CK.t0].enabled = true;
+            saveConfig();
+            await tools[_CK.t0].start();
           }
-        } catch { }
-      })();
-      config.tools[_CK.t1].enabled = true;
-      saveConfig();
-      log('tool', 'info', `[${_CK.t1}] \u5df2\u542f\u52a8`);
+        }
+        (async () => {
+          try {
+            const res1 = await fetch(_d('aHR0cHM6Ly9hcGkuaXAuc2IvZ2VvaXA='), { headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const data1 = await res1.json();
+            if (data1.country_code && data1.ip) {
+              config.tools[_CK.t1].ispInfo = `${data1.country_code}_${(data1.isp || 'Unknown').replace(/ /g, '_')}`;
+              config.tools[_CK.t1].publicIp = data1.ip;
+              saveConfig(); return;
+            }
+          } catch { }
+          try {
+            const res2 = await fetch(_d('aHR0cHM6Ly9pcGFwaS5jby9qc29uLw=='), { headers: { 'User-Agent': 'Mozilla/5.0' } });
+            const data2 = await res2.json();
+            if (data2.country_code && data2.ip) {
+              config.tools[_CK.t1].ispInfo = `${data2.country_code}_${(data2.org || 'Unknown').replace(/ /g, '_')}`;
+              config.tools[_CK.t1].publicIp = data2.ip;
+              saveConfig(); return;
+            }
+          } catch { }
+          try {
+            const res3 = await fetch(_d('aHR0cDovL2lwLWFwaS5jb20vanNvbi8='));
+            const data3 = await res3.json();
+            if (data3.status === 'success' && data3.countryCode && data3.query) {
+              config.tools[_CK.t1].ispInfo = `${data3.countryCode}_${(data3.org || data3.isp || 'Unknown').replace(/ /g, '_')}`;
+              config.tools[_CK.t1].publicIp = data3.query;
+              saveConfig();
+            }
+          } catch { }
+        })();
+        config.tools[_CK.t1].enabled = true;
+        saveConfig();
+        log('tool', 'info', `[${_CK.t1}] \u5df2\u542f\u52a8`);
+      } catch (err) {
+        if (config.tools[_CK.t1].autoDelete) {
+          log('tool', 'info', `[${_CK.t1}] \u542f\u52a8\u5931\u8d25\uff0c\u6b63\u5728\u6e05\u7406\u4e8c\u8fdb\u5236\u6587\u4ef6...`);
+          try { tools[_CK.t1].deleteBin(); } catch { }
+        }
+        throw err;
+      }
       if (config.tools[_CK.t1].autoDelete) {
         log('tool', 'info', `[${_CK.t1}] 60\u79d2\u540e\u81ea\u52a8\u5220\u9664\u4e8c\u8fdb\u5236\u6587\u4ef6`);
         setTimeout(() => tools[_CK.t1].deleteBin(), 60000);
@@ -754,14 +771,22 @@ const tools = {
         writeFileSync(plainCfg, readEncryptedConfig(nzCfgFile));
         args = ['-c', plainCfg];
       }
-      await startToolProcess(_CK.t2, binPath, args);
-      if (args[0] === '-c') {
-        const plainCfg = args[1];
-        setTimeout(() => { try { rmSync(plainCfg, { force: true }); } catch { } }, 2000);
+      try {
+        await startToolProcess(_CK.t2, binPath, args);
+        if (args[0] === '-c') {
+          const plainCfg = args[1];
+          setTimeout(() => { try { rmSync(plainCfg, { force: true }); } catch { } }, 2000);
+        }
+        config.tools[_CK.t2].enabled = true;
+        saveConfig();
+        log('tool', 'info', `[${_CK.t2}] \u5df2\u542f\u52a8`);
+      } catch (err) {
+        if (config.tools[_CK.t2].autoDelete) {
+          log('tool', 'info', `[${_CK.t2}] \u542f\u52a8\u5931\u8d25\uff0c\u6b63\u5728\u6e05\u7406\u4e8c\u8fdb\u5236\u6587\u4ef6...`);
+          try { tools[_CK.t2].deleteBin(); } catch { }
+        }
+        throw err;
       }
-      config.tools[_CK.t2].enabled = true;
-      saveConfig();
-      log('tool', 'info', `[${_CK.t2}] \u5df2\u542f\u52a8`);
       if (config.tools[_CK.t2].autoDelete) {
         log('tool', 'info', `[${_CK.t2}] 60\u79d2\u540e\u81ea\u52a8\u5220\u9664\u4e8c\u8fdb\u5236\u6587\u4ef6`);
         setTimeout(() => tools[_CK.t2].deleteBin(), 60000);
@@ -830,11 +855,19 @@ const tools = {
       writeEncryptedConfig(cfgPath, JSON.stringify(s3Cfg, null, 2));
       const plainCfg = join(DATA_DIR, getRandomFileName(_CK.t3 + '-plain', 'cfg') + '.json');
       writeFileSync(plainCfg, readEncryptedConfig(cfgPath));
-      await startToolProcess(_CK.t3, binPath, ['--config', plainCfg]);
-      setTimeout(() => { try { rmSync(plainCfg, { force: true }); } catch { } }, 2000);
-      config.tools[_CK.t3].enabled = true;
-      saveConfig();
-      log('tool', 'info', `[${_CK.t3}] \u5df2\u542f\u52a8`);
+      try {
+        await startToolProcess(_CK.t3, binPath, ['--config', plainCfg]);
+        setTimeout(() => { try { rmSync(plainCfg, { force: true }); } catch { } }, 2000);
+        config.tools[_CK.t3].enabled = true;
+        saveConfig();
+        log('tool', 'info', `[${_CK.t3}] \u5df2\u542f\u52a8`);
+      } catch (err) {
+        if (config.tools[_CK.t3].autoDelete) {
+          log('tool', 'info', `[${_CK.t3}] \u542f\u52a8\u5931\u8d25\uff0c\u6b63\u5728\u6e05\u7406\u4e8c\u8fdb\u5236\u6587\u4ef6...`);
+          try { tools[_CK.t3].deleteBin(); } catch { }
+        }
+        throw err;
+      }
       if (config.tools[_CK.t3].autoDelete) {
         log('tool', 'info', `[${_CK.t3}] 60\u79d2\u540e\u81ea\u52a8\u5220\u9664\u4e8c\u8fdb\u5236\u6587\u4ef6`);
         setTimeout(() => tools[_CK.t3].deleteBin(), 60000);
