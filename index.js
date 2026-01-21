@@ -1419,6 +1419,15 @@ const HTML = `<!DOCTYPE html>
       }
     };
 
+    window.saveSystemConfig = async () => {
+      try {
+        const port = document.getElementById('sys-port').value;
+        await api('/system/config', 'POST', { webPort: port });
+        toast('\u7cfb\u7edf\u8bbe\u7f6e\u5df2\u66f4\u65b0');
+      } catch (e) {
+        toast(e.message, 'error');
+      }
+    };
 
     window.toolAction = async (name, action) => {
       try {
