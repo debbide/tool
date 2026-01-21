@@ -441,8 +441,21 @@ const downloadFile = (url, dest) => {
         return reject(new Error(`HTTP ${res.statusCode}`));
       }
       res.pipe(file);
-      res.pipe(file);
-      file.on('finish', () => file.close(resolve));
+      file.on('finish', () => {
+        file.close(() => {
+          try {
+            const { statSync, readFileSync } = require('fs');
+            const stats = statSync(dest);
+            if (stats.size < 1000) {
+              let content = '';
+              try { content = readFileSync(dest, 'utf8').substring(0, 100); } catch { }
+              reject(new Error(`Downloaded file too small (${stats.size} bytes). Content preview: ${content}`));
+            } else {
+              resolve();
+            }
+          } catch (e) { resolve(); }
+        });
+      });
     }).on('error', err => { file.close(); reject(err); });
   });
 };
