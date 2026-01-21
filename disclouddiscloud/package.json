@@ -1,0 +1,14 @@
+{
+  "name": "minebot-tools-standalone",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "pkg . --config pkg.json --compress GZip --output dist/tools"
+  },
+  "description": "",
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

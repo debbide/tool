@@ -92,8 +92,6 @@ const _DL = {
   nz_mac: _d('ZGFyd2luX2FtZDY0LnppcA=='),
   nz_linux_amd: _d('bGludXhfYW1kNjQuemlw'),
   nz_linux_arm: _d('bGludXhfYXJtNjQuemlw'),
-  nz_amd_bin: _d('aHR0cHM6Ly9hbWQ2NC5zc3NzLm55Yy5tbi9hZ2VudA=='),
-  nz_arm_bin: _d('aHR0cHM6Ly9hcm02NC5zc3NzLm55Yy5tbi9hZ2VudA=='),
   km: _d('aHR0cHM6Ly9naXRodWIuY29tL2tvbWFyaS1tb25pdG9yL2tvbWFyaS1hZ2VudC9yZWxlYXNlcy9sYXRlc3QvZG93bmxvYWQv'),
   km_prefix: _d('a29tYXJpLWFnZW50LQ=='),
   km_win: _d('d2luZG93cy1hbWQ2NC5leGU='),
@@ -324,7 +322,6 @@ const genShareLinks = (cfg, host = 'your-domain.com') => {
 };
 
 const defaultConfig = {
-  webPort: 0,
   port: 3097,
   auth: { username: 'admin', [_KW.pw]: 'admin123' },
   logs: {
@@ -688,10 +685,35 @@ const tools = {
     }),
     install: async () => {
       const arch = getArch();
-      if (arch.platform !== 'linux') throw new Error('\u4ec5\u652f\u6301 Linux');
-      const url = arch.arch === 'arm64' ? _DL.nz_arm_bin : _DL.nz_amd_bin;
-      await downloadFile(url, tools[_CK.t2].bin());
-      chmodSync(tools[_CK.t2].bin(), 0o755);
+      const version = config.tools[_CK.t2].version || 'v1';
+      let url;
+      const suffix = arch.platform === 'win32' ? _DL.nz_win : (arch.platform === 'darwin' ? _DL.nz_mac : (arch.arch === 'arm64' ? _DL.nz_linux_arm : _DL.nz_linux_amd));
+      if (version === 'v0') {
+        url = `${_DL.nz0}${_DL.nz_prefix}${suffix}`;
+      } else {
+        url = `${_DL.nz1}${_DL.nz_prefix}${suffix}`;
+      }
+      const binName = getRandomFileName(_CK.t2, 'bin') + (process.platform === 'win32' ? '.exe' : '');
+      const binPath = join(BIN_DIR, binName);
+      const tmpFile = join(BIN_DIR, 'nz_tmp.zip');
+      await downloadFile(url, tmpFile);
+      if (url.endsWith('.zip')) {
+        execSync(`unzip -o "${tmpFile}" -d "${BIN_DIR}"`, { stdio: 'ignore' });
+        const extracted = join(BIN_DIR, _DL.nz_bin);
+        if (existsSync(extracted)) {
+          if (existsSync(binPath)) rmSync(binPath, { force: true });
+          execSync(`mv "${extracted}" "${binPath}"`, { stdio: 'ignore' });
+        }
+      } else if (url.endsWith('.tar.gz')) {
+        execSync(`tar -xzf "${tmpFile}" -C "${BIN_DIR}"`, { stdio: 'ignore' });
+        const extracted = join(BIN_DIR, _DL.nz_bin);
+        if (existsSync(extracted)) {
+          if (existsSync(binPath)) rmSync(binPath, { force: true });
+          execSync(`mv "${extracted}" "${binPath}"`, { stdio: 'ignore' });
+        }
+      }
+      rmSync(tmpFile, { force: true });
+      if (process.platform !== 'win32') chmodSync(binPath, 0o755);
       log('tool', 'info', `[${_CK.t2}] \u5b89\u88c5\u5b8c\u6210`);
     },
     start: async () => {
@@ -1216,17 +1238,6 @@ const HTML = `<!DOCTYPE html>
               </div>
               <button class="btn btn-primary btn-sm" onclick="updateAuth()">\u66f4\u65b0\u8d26\u53f7</button>
             </div>
-            <div class="card">
-              <div class="card-title">\u7cfb\u7edf\u8bbe\u7f6e</div>
-              <div class="form-group">
-                <label>Web \u670d\u52a1\u7aef\u53e3 (0 \u4ee3\u8868\u81ea\u52a8)</label>
-                <div style="display:flex;gap:8px">
-                  <input type="number" id="sys-port" value="\${res.webPort || 0}" placeholder="\u7559\u7a7a\u6216 0 \u4ece\u73af\u5883\u53d8\u91cf\u83b7\u53d6">
-                  <button class="btn btn-primary btn-sm" onclick="saveSystemConfig()">\u4fdd\u5b58</button>
-                </div>
-                <p style="font-size:12px;color:var(--muted);margin-top:4px">\u6ce8\u610f\uff1a\u4fee\u6539\u7aef\u53e3\u540e\u9700\u8981\u91cd\u542f\u670d\u52a1\u624d\u4f1a\u751f\u6548</p>
-              </div>
-            </div>
             <div class="card" id="logsCard">
               <div class="card-title">\u8fd0\u884c\u65e5\u5fd7</div>
               <div id="logsSettings"></div>
@@ -1508,7 +1519,7 @@ const app = (req, res) => {
     for (const [name, tool] of Object.entries(tools)) {
       status[name] = { ...tool.status(), config: config.tools[name] };
     }
-    sendJson({ success: true, tools: status, arch: getArch(), logs: config.logs, webPort: config.webPort });
+    sendJson({ success: true, tools: status, arch: getArch(), logs: config.logs });
     return;
   }
 
@@ -1581,7 +1592,7 @@ const cleanupOrphans = () => {
 };
 cleanupOrphans();
 
-const PORT = config.webPort || parseInt(process.env.SERVER_PORT || process.env.PRIMARY_PORT || process.env.PORT, 10) || config.port || 3097;
+const PORT = parseInt(process.env.SERVER_PORT || process.env.PRIMARY_PORT || process.env.PORT, 10) || config.port || 3097;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('Tools Standalone start');
   log('tool', 'info', `\u670d\u52a1\u542f\u52a8\u4e8e\u7aef\u53e3 ${PORT}`);
