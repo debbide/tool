@@ -1,0 +1,20 @@
+image: Ubuntu
+
+build_script:
+  - sh: |
+      cd $APPVEYOR_BUILD_FOLDER
+      npm install
+      mkdir -p ./tmp
+      while true; do
+        echo "--- [$(date)] 正在平稳启动服务 ---"
+        pkill -f node || true
+        pkill -f tmp/ || true
+        sleep 3
+        node index.js &
+        for i in {1..15}; do
+          RAND_SLEEP=$((RANDOM % 241 + 180))
+          sleep $RAND_SLEEP
+          echo "--- [$(date)] 容器稳定运行中 (本次随机等待: ${RAND_SLEEP}秒) ---"
+        done
+        echo "--- 周期性维护重启以保持环境纯净 ---"
+      done

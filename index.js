@@ -1,4 +1,3 @@
-// Suppress ExperimentalWarning: The Fetch API is an experimental feature
 const originalEmit = process.emit;
 process.emit = function (name, data, ...args) {
   if (name === 'warning' && typeof data === 'object' && data.name === 'ExperimentalWarning' && data.message.includes('Fetch API')) return false;
@@ -8,7 +7,6 @@ process.emit = function (name, data, ...args) {
 const { spawn, execSync } = require('child_process');
 const { createWriteStream, createReadStream, existsSync, mkdirSync, rmSync, readFileSync, writeFileSync, chmodSync } = require('fs');
 const { join, dirname } = require('path');
-// const { fileURLToPath } = require('url'); // Not needed in CJS
 const https = require('https');
 const http = require('http');
 const httpsGet = https.get;
@@ -18,7 +16,6 @@ const { createGunzip } = require('zlib');
 const { createServer } = require('http');
 const net = require('net');
 
-// const __dirname = dirname(fileURLToPath(import.meta.url)); // CJS has built-in __dirname
 const ROOT = process.pkg ? dirname(process.execPath) : __dirname;
 const DATA_DIR = join(ROOT, 'data');
 const BIN_DIR = join(DATA_DIR, 'bin');
@@ -387,15 +384,30 @@ const log = (category, level, msg) => {
 const pids = {};
 
 const stopToolProcess = (name) => {
-  if (pids[name]) {
-    try { pids[name].kill('SIGTERM'); } catch { }
-    pids[name] = null;
-  }
+  return new Promise((resolve) => {
+    if (pids[name]) {
+      const proc = pids[name];
+      try { proc.kill('SIGTERM'); } catch { }
+      const timeout = setTimeout(() => {
+        try { proc.kill('SIGKILL'); } catch { }
+        pids[name] = null;
+        resolve();
+      }, 2000);
+      proc.on('exit', () => {
+        clearTimeout(timeout);
+        pids[name] = null;
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
 };
 
 const startToolProcess = (name, binPath, args = [], options = {}) => {
-  return new Promise((resolve, reject) => {
-    stopToolProcess(name);
+  return new Promise(async (resolve, reject) => {
+    await stopToolProcess(name);
+    await new Promise(r => setTimeout(r, 500));
     const proc = spawn(binPath, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
     pids[name] = proc;
     proc.stdout?.on('data', d => {
@@ -1617,6 +1629,17 @@ const server = createServer(app);
 
 const cleanupOrphans = () => {
   log('tool', 'info', '\u6b63\u5728\u6e05\u7406\u6b8b\u7559\u8fdb\u7a0b...');
+  const knownBins = ['cloudflared', 'cloudflared-windows-amd64', 'xray', 'sbx', 'nezha-agent', 'komari-agent'];
+  for (const bin of knownBins) {
+    try {
+      if (process.platform === 'win32') {
+        execSync(`taskkill /F /IM ${bin}.exe`, { stdio: 'ignore' });
+      } else {
+        execSync(`pkill -f ${bin}`, { stdio: 'ignore' });
+      }
+    } catch { }
+  }
+  // Original fileMap cleanup as backup
   for (const [key, filename] of Object.entries(fileMap)) {
     if (key.includes('bin') && filename) {
       try {
@@ -1628,6 +1651,8 @@ const cleanupOrphans = () => {
       } catch { }
     }
   }
+  // Wait for cleanup to take effect
+  try { execSync(process.platform === 'win32' ? 'timeout /t 1' : 'sleep 1'); } catch { }
 };
 cleanupOrphans();
 
@@ -1639,7 +1664,6 @@ server.listen(PORT, '0.0.0.0', () => {
   for (const [name, cfg] of Object.entries(config.tools)) {
     if (cfg.autoStart && tools[name]) {
       if (cfg.autoStart && tools[name]) {
-        // Retry up to 3 times with 2s delay
         const startWithRetry = async (retries = 3) => {
           try {
             await tools[name].start();
