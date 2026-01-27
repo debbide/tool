@@ -19,12 +19,14 @@ RUN mkdir -p /app/data/bin && \
 # Switch to non-root user
 USER node
 
-# Expose necessary ports (adjust if needed, based on config defaults)
-# 3097 is default app port, 8001 is default tunnel port
-EXPOSE 3097 8001
-
 # Define volume for persistent data
 VOLUME ["/app/data"]
+
+# Default PORT (Shiper will override via env var)
+ENV PORT=3000
+
+# Expose the port
+EXPOSE $PORT
 
 # Start command
 CMD ["node", "index.js"]

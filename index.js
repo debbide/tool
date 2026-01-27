@@ -1657,8 +1657,9 @@ const cleanupOrphans = () => {
 cleanupOrphans();
 
 const PORT = parseInt(process.env.PORT || process.env.SERVER_PORT || process.env.PRIMARY_PORT, 10) || config.webPort || config.port || 3097;
+console.log(`[DEBUG] PORT env: ${process.env.PORT}, SERVER_PORT env: ${process.env.SERVER_PORT}, Final PORT: ${PORT}`);
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('Tools Standalone start');
+  console.log(`Tools Standalone start on port ${PORT}`);
   log('tool', 'info', `\u670d\u52a1\u542f\u52a8\u4e8e\u7aef\u53e3 ${PORT}`);
 
   for (const [name, cfg] of Object.entries(config.tools)) {
